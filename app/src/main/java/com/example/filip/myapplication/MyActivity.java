@@ -25,16 +25,15 @@ public class MyActivity extends Activity {
             @Override
             public void onClick(View view) {
                 if (gps.canGetLocation()) {
-                    Location lastLocation = gps.getLocation();
-                    ((TextView) findViewById(R.id.textViewLat)).setText(String.valueOf(lastLocation.getLatitude()));
-                    ((TextView) findViewById(R.id.textViewLng)).setText(String.valueOf(lastLocation.getLongitude()));
-                    ((TextView) findViewById(R.id.textViewAcc)).setText(String.valueOf(lastLocation.getAccuracy()));
-                    ((TextView) findViewById(R.id.textView17)).setText(String.valueOf(lastLocation.getAltitude()));
-                    ((TextView) findViewById(R.id.textView18)).setText(String.valueOf(lastLocation.getBearing()));
-                    ((TextView) findViewById(R.id.textViewTime)).setText(String.valueOf(lastLocation.getTime()));
-                    ((TextView) findViewById(R.id.textViewProvider)).setText(String.valueOf(lastLocation.getProvider()));
-                    ((TextView) findViewById(R.id.textViewSpeed)).setText(String.valueOf(lastLocation.getSpeed()));
-//                    ((TextView) findViewById(R.id.textViewSat)).setText(String.valueOf(lastLocation.getExtras().getInt("satellites")));
+                    ((TextView) findViewById(R.id.textViewLat)).setText(String.valueOf(gps.getLatitude()));
+                    ((TextView) findViewById(R.id.textViewLng)).setText(String.valueOf(gps.getLongitude()));
+                    ((TextView) findViewById(R.id.textViewAcc)).setText(String.valueOf(gps.getAccuracy()));
+                    ((TextView) findViewById(R.id.textView17)).setText(String.valueOf(gps.getAltitude()));
+                    ((TextView) findViewById(R.id.textView18)).setText(String.valueOf(gps.getBearing()));
+                    ((TextView) findViewById(R.id.textViewTime)).setText(String.valueOf(gps.getTime()));
+                    ((TextView) findViewById(R.id.textViewProvider)).setText(String.valueOf(gps.getProvider()));
+                    ((TextView) findViewById(R.id.textViewSpeed)).setText(String.valueOf(gps.getSpeed()));
+//                    ((TextView) findViewById(R.id.textViewSat)).setText(gps.getNumberOfSatellites());
                 } else {
                     gps.showSettingsAlert();
                 }

@@ -5,9 +5,11 @@ import android.app.Service;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.location.GpsStatus;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.location.LocationProvider;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.provider.Settings;
@@ -31,6 +33,14 @@ public class GPSTracker extends Service implements LocationListener {
     Location location; // location
     double latitude; // latitude
     double longitude; // longitude
+    private float accuracy;
+
+    private double altitude;
+    private float bearing;
+    private long time;
+    private String provider;
+    private float speed;
+    private int numberOfSatellites;
 
     // The minimum distance to change Updates in meters
     private static final long MIN_DISTANCE_CHANGE_FOR_UPDATES = 0; // 10 meters
@@ -41,9 +51,14 @@ public class GPSTracker extends Service implements LocationListener {
     // Declaring a Location Manager
     protected LocationManager locationManager;
 
+    // GpsStatus
+//    GpsStatus gpsStatus;
+
     public GPSTracker(Context context) {
         this.mContext = context;
         getLocation();
+
+//        gpsStatus = new GpsStatus();
     }
 
     public Location getLocation() {
@@ -76,13 +91,13 @@ public class GPSTracker extends Service implements LocationListener {
                         if (location != null) {
                             latitude = location.getLatitude();
                             longitude = location.getLongitude();
-//                            accuracy = location.getAccuracy();
-//                            altitude = location.getAltitude();
-//                            bearing = location.getBearing();
-//                            time = location.getTime();
-//                            provider = location.getProvider();
-//                            speed = location.getSpeed();
-//                            numberOfSatellites = location.getExtras().getInt("satellites");
+                            accuracy = location.getAccuracy();
+                            altitude = location.getAltitude();
+                            bearing = location.getBearing();
+                            time = location.getTime();
+                            provider = location.getProvider();
+                            speed = location.getSpeed();
+                            numberOfSatellites = location.getExtras().getInt("satellites");
                         }
                     }
                 }
@@ -128,7 +143,21 @@ public class GPSTracker extends Service implements LocationListener {
 
     @Override
     public void onStatusChanged(String provider, int status, Bundle extras) {
-        Toast.makeText(mContext, "Status Changed\nProvider: " + provider + "\nStatus: " + status, Toast.LENGTH_LONG).show();
+        String statusText = "";
+        switch (status) {
+            case LocationProvider.AVAILABLE:
+                statusText = "Available";
+                break;
+            case LocationProvider.OUT_OF_SERVICE:
+                statusText = "Out of service";
+                break;
+            case LocationProvider.TEMPORARILY_UNAVAILABLE:
+                statusText = "Temporarily unavailable";
+                break;
+            default:
+                break;
+        }
+        Toast.makeText(mContext, "Status Changed\nProvider: " + provider + "\nStatus: " + statusText, Toast.LENGTH_LONG).show();
     }
 
     @Override
@@ -158,6 +187,55 @@ public class GPSTracker extends Service implements LocationListener {
 
         // return longitude
         return longitude;
+    }
+
+    public float getAccuracy() {
+        if(location != null){
+            accuracy = location.getAccuracy();
+        }
+        return accuracy;
+    }
+
+    public double getAltitude() {
+        if(location != null){
+            altitude = location.getAltitude();
+        }
+        return altitude;
+    }
+
+    public float getBearing() {
+        if(location != null){
+            bearing = location.getBearing();
+        }
+        return bearing;
+    }
+
+    public long getTime() {
+        if(location != null){
+            time = location.getTime();
+        }
+        return time;
+    }
+
+    public String getProvider() {
+        if(location != null){
+            provider = location.getProvider();
+        }
+        return provider;
+    }
+
+    public float getSpeed() {
+        if(location != null){
+            speed = location.getSpeed();
+        }
+        return speed;
+    }
+
+    public int getNumberOfSatellites() {
+        if(location != null){
+            numberOfSatellites = location.getExtras().getInt("satellites");
+        }
+        return numberOfSatellites;
     }
 
     /**
