@@ -11,10 +11,11 @@
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="New Button"
-        android:id="@+id/button"
+        android:text="Single"
+        android:id="@+id/buttonSingle"
         android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true" />
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true" />
 
     <TextView
         android:layout_width="wrap_content"
@@ -22,17 +23,16 @@
         android:textAppearance="?android:attr/textAppearanceMedium"
         android:text="Lat"
         android:id="@+id/textView"
-        android:layout_below="@+id/button"
+        android:layout_below="@+id/editTextUpdateInterval"
         android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true"
-        android:layout_marginTop="45dp" />
+        android:layout_alignParentStart="true" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceMedium"
         android:text="Lng"
-        android:id="@+id/textView2"
+        android:id="@+id/textViewList"
         android:layout_below="@+id/textView"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true" />
@@ -43,7 +43,7 @@
         android:textAppearance="?android:attr/textAppearanceMedium"
         android:text="Acc"
         android:id="@+id/textView3"
-        android:layout_below="@+id/textView2"
+        android:layout_below="@+id/textViewList"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true" />
 
@@ -83,7 +83,7 @@
         android:textAppearance="?android:attr/textAppearanceMedium"
         android:text="Medium Text"
         android:id="@+id/textViewLng"
-        android:layout_alignTop="@+id/textView2"
+        android:layout_alignTop="@+id/textViewList"
         android:layout_alignParentRight="true"
         android:layout_alignParentEnd="true" />
 
@@ -196,5 +196,39 @@
         android:layout_below="@+id/textViewSpeed"
         android:layout_alignRight="@+id/textViewSpeed"
         android:layout_alignEnd="@+id/textViewSpeed" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Continous"
+        android:id="@+id/buttonCont"
+        android:layout_alignParentTop="true"
+        android:layout_toRightOf="@+id/buttonSingle" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Stop"
+        android:id="@+id/buttonStop"
+        android:layout_toRightOf="@+id/buttonCont" />
+
+    <EditText
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:inputType="numberDecimal"
+        android:ems="10"
+        android:id="@+id/editTextUpdateInterval"
+        android:layout_below="@+id/buttonSingle"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:text="3000" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Show db"
+        android:id="@+id/buttonShow"
+        android:layout_alignParentTop="true"
+        android:layout_toRightOf="@+id/buttonStop" />
 
 </RelativeLayout>

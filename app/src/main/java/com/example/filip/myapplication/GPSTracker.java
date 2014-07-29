@@ -38,6 +38,7 @@ public class GPSTracker extends Service implements LocationListener {
     private double altitude;
     private float bearing;
     private long time;
+    private long elapsedRealTime;
     private String provider;
     private float speed;
     private int numberOfSatellites;
@@ -46,22 +47,95 @@ public class GPSTracker extends Service implements LocationListener {
     private static final long MIN_DISTANCE_CHANGE_FOR_UPDATES = 0; // 10 meters
 
     // The minimum time between updates in milliseconds
-    private static final long MIN_TIME_BW_UPDATES = 1000 * 60 / 10; // 10 sec
+    private static final long MIN_TIME_BW_UPDATES = 0; // 10 sec
 
     // Declaring a Location Manager
     protected LocationManager locationManager;
+    private boolean isRequestingLocationUpdates;
+    private int updateCounter;
+    private long timeOfFirstUpdate;
 
     // GpsStatus
 //    GpsStatus gpsStatus;
 
     public GPSTracker(Context context) {
         this.mContext = context;
-        getLocation();
-
+//        getLocation();
+        updateCounter = 0;
 //        gpsStatus = new GpsStatus();
     }
 
-    public Location getLocation() {
+    /**
+     *
+     * @param locationListener if null then default from GPSTracker
+     * @return Location
+     */
+    public Location requestLocationSingleUpdate(LocationListener locationListener) {
+        if (locationListener == null) {
+            locationListener = this;
+        }
+        try {
+            if (locationManager == null)
+                locationManager = (LocationManager) mContext
+                        .getSystemService(LOCATION_SERVICE);
+
+            // getting GPS status
+            isGPSEnabled = locationManager
+                    .isProviderEnabled(LocationManager.GPS_PROVIDER);
+
+            // getting network status
+            isNetworkEnabled = locationManager
+                    .isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+
+            if (!isGPSEnabled && !isNetworkEnabled) {
+                // no network provider is enabled
+            } else {
+//                this.canGetLocation = true;
+
+                // First get location from Network Provider
+                if (isNetworkEnabled && !isGPSEnabled) {
+                    locationManager.requestSingleUpdate(
+                            LocationManager.NETWORK_PROVIDER,
+                            locationListener,
+                            null);
+                    Log.d("Location obtained by", "Network");
+
+                    location = locationManager
+                            .getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                    if (location != null) {
+                        getDataFromLocation();
+                    }
+                }
+                // if GPS Enabled get lat/long using GPS Services
+                if (isGPSEnabled) {
+                    locationManager.requestSingleUpdate(
+                            LocationManager.GPS_PROVIDER,
+                            locationListener,
+                            null);
+                    Log.d("Location obtained by", "GPS");
+
+                    location = locationManager
+                            .getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                    if (location != null) {
+                        getDataFromLocation();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return location;
+    }
+
+    /**
+     *
+     * @param locationListener if null then default from GPSTracker
+     * @return Location
+     */
+    public Location requestLocationUpdates(int updateInterval, LocationListener locationListener) {
+        if (locationListener == null) {
+            locationListener = this;
+        }
         try {
             locationManager = (LocationManager) mContext
                     .getSystemService(LOCATION_SERVICE);
@@ -79,66 +153,64 @@ public class GPSTracker extends Service implements LocationListener {
             } else {
                 this.canGetLocation = true;
                 // First get location from Network Provider
-                if (isNetworkEnabled) {
+                if (isNetworkEnabled && !isGPSEnabled) {
                     locationManager.requestLocationUpdates(
                             LocationManager.NETWORK_PROVIDER,
                             MIN_TIME_BW_UPDATES,
-                            MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
-                    Log.d("Network", "Network");
-                    if (locationManager != null) {
-                        location = locationManager
-                                .getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-                        if (location != null) {
-                            latitude = location.getLatitude();
-                            longitude = location.getLongitude();
-                            accuracy = location.getAccuracy();
-                            altitude = location.getAltitude();
-                            bearing = location.getBearing();
-                            time = location.getTime();
-                            provider = location.getProvider();
-                            speed = location.getSpeed();
-                            numberOfSatellites = location.getExtras().getInt("satellites");
-                        }
-                    }
+                            MIN_DISTANCE_CHANGE_FOR_UPDATES, locationListener);
+                    Log.d("Location obtained by", "Network");
                 }
                 // if GPS Enabled get lat/long using GPS Services
                 if (isGPSEnabled) {
-                    if(true) { //if (location == null) {
-                        locationManager.requestLocationUpdates(
-                                LocationManager.GPS_PROVIDER,
-                                MIN_TIME_BW_UPDATES,
-                                MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
-                        Log.d("GPS Enabled", "GPS Enabled");
-                        if (locationManager != null) {
-                            location = locationManager
-                                    .getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                            if (location != null) {
-                                latitude = location.getLatitude();
-                                longitude = location.getLongitude();
-                            }
-                        }
-                    }
+                    locationManager.requestLocationUpdates(
+                            LocationManager.GPS_PROVIDER,
+                            MIN_TIME_BW_UPDATES,
+                            MIN_DISTANCE_CHANGE_FOR_UPDATES, locationListener);
+                    Log.d("Location obtained by", "GPS");
                 }
+
+                isRequestingLocationUpdates = true;
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
 
+
         return location;
     }
+
+    private void getDataFromLocation() {
+        latitude = location.getLatitude();
+        longitude = location.getLongitude();
+        accuracy = location.getAccuracy();
+        altitude = location.getAltitude();
+        bearing = location.getBearing();
+        time = location.getTime();
+//        elapsedRealTime = location.getElapsedRealtimeNanos();
+        provider = location.getProvider();
+        speed = location.getSpeed();
+        numberOfSatellites = location.getExtras().getInt("satellites");
+    }
+
     @Override
     public void onLocationChanged(Location location) {
-        Toast.makeText(mContext, "Location Update\nLat: " + latitude + "\nLng: " + longitude, Toast.LENGTH_LONG).show();
+        this.location = location;
+        Toast.makeText(mContext, "Location Update\nLat: " + location.getLatitude() + "\nLng: " + location.getLongitude(), Toast.LENGTH_SHORT).show();
+        updateCounter++;
+        if (timeOfFirstUpdate == 0) {
+            timeOfFirstUpdate = location.getTime();
+        }
+
     }
 
     @Override
     public void onProviderDisabled(String provider) {
-        Toast.makeText(mContext, "Provider Disabled\nProvider: " + provider, Toast.LENGTH_LONG).show();
+        Toast.makeText(mContext, "Provider Disabled\nProvider: " + provider, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onProviderEnabled(String provider) {
-        Toast.makeText(mContext, "Provider Enabled\nProvider: " + provider, Toast.LENGTH_LONG).show();
+        Toast.makeText(mContext, "Provider Enabled\nProvider: " + provider, Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -157,7 +229,7 @@ public class GPSTracker extends Service implements LocationListener {
             default:
                 break;
         }
-        Toast.makeText(mContext, "Status Changed\nProvider: " + provider + "\nStatus: " + statusText, Toast.LENGTH_LONG).show();
+        Toast.makeText(mContext, "Status Changed\nProvider: " + provider + "\nStatus: " + statusText, Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -284,9 +356,16 @@ public class GPSTracker extends Service implements LocationListener {
      * Stop using GPS listener
      * Calling this function will stop using GPS in your app
      * */
-    public void stopUsingGPS(){
+    public void stopUsingGPS(LocationListener locationListener){
+        if (locationListener == null) {
+            locationListener = GPSTracker.this;
+        }
         if(locationManager != null){
-            locationManager.removeUpdates(GPSTracker.this);
+            locationManager.removeUpdates(locationListener);
+            isRequestingLocationUpdates = false;
+            updateCounter = 0;
         }
     }
+
+    public boolean isRequestingLocationUpdates() { return isRequestingLocationUpdates; }
 }
