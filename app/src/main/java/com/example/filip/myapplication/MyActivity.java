@@ -5,6 +5,9 @@ import android.content.Intent;
 import android.location.Location;
 import android.location.LocationListener;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -18,15 +21,19 @@ import com.example.filip.myapplication.db.DbHandler;
 
 public class MyActivity extends Activity {
 
+    Button buttonSingle;
     Button buttonCont;
     Button buttonStop;
     Button buttonShow;
     EditText editTextUpdateInterval;
     GPSTracker gps;
     private LocationListener locationListener;
-    private LocationListener locationListener2;
-
+    private LocationListener locationListenerForDebugWithoutWritingToDb;
+    private LocationListener locationListenerForUpdates;
+    private LocationListener locationListenerForContinuousSingleUpdate;
     DbHandler dbHandler;
+    Thread t;
+    Handler locationHandler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,15 +41,14 @@ public class MyActivity extends Activity {
         setContentView(R.layout.activity_my);
 
         dbHandler = new DbHandler(this);
-
+        buttonSingle = ((Button) findViewById(R.id.buttonSingle));
         buttonCont = (Button) findViewById(R.id.buttonCont);
         buttonStop = (Button) findViewById(R.id.buttonStop);
         buttonShow = (Button) findViewById(R.id.buttonShow);
         editTextUpdateInterval = (EditText) findViewById(R.id.editTextUpdateInterval);
-
         gps = new GPSTracker(this);
 
-        locationListener = new LocationListener() {
+        locationListenerForDebugWithoutWritingToDb = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
                 gps.onLocationChanged(location);
@@ -65,7 +71,7 @@ public class MyActivity extends Activity {
             }
         };
 
-        locationListener2 = new LocationListener() {
+        locationListenerForUpdates = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
                 dbHandler.addLocation(location);
@@ -73,40 +79,38 @@ public class MyActivity extends Activity {
             }
 
             @Override
-            public void onStatusChanged(String s, int i, Bundle bundle) {
-
-            }
+            public void onStatusChanged(String s, int i, Bundle bundle) {}
 
             @Override
-            public void onProviderEnabled(String s) {
-
-            }
+            public void onProviderEnabled(String s) {}
 
             @Override
-            public void onProviderDisabled(String s) {
-
-            }
+            public void onProviderDisabled(String s) {}
         };
 
-        ((Button) findViewById(R.id.buttonSingle)).setOnClickListener(new View.OnClickListener() {
+        locationListenerForContinuousSingleUpdate = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                dbHandler.addLocation(location);
+                Log.d("Got it", String.valueOf(location.getTime()));
+                locationHandler.sendMessage(Message.obtain());
+            }
+
+            @Override
+            public void onStatusChanged(String s, int i, Bundle bundle) {}
+
+            @Override
+            public void onProviderEnabled(String s) {}
+
+            @Override
+            public void onProviderDisabled(String s) {}
+        };
+
+        buttonSingle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                locationListener = locationListenerForDebugWithoutWritingToDb;
                 gps.requestLocationSingleUpdate(locationListener);
-                /*
-                if (gps.canGetLocation()) {
-                    ((TextView) findViewById(R.id.textViewLat)).setText(String.valueOf(gps.getLatitude()));
-                    ((TextView) findViewById(R.id.textViewLng)).setText(String.valueOf(gps.getLongitude()));
-                    ((TextView) findViewById(R.id.textViewAcc)).setText(String.valueOf(gps.getAccuracy()));
-                    ((TextView) findViewById(R.id.textView17)).setText(String.valueOf(gps.getAltitude()));
-                    ((TextView) findViewById(R.id.textView18)).setText(String.valueOf(gps.getBearing()));
-                    ((TextView) findViewById(R.id.textViewTime)).setText(String.valueOf(gps.getTime()));
-                    ((TextView) findViewById(R.id.textViewProvider)).setText(String.valueOf(gps.getProvider()));
-                    ((TextView) findViewById(R.id.textViewSpeed)).setText(String.valueOf(gps.getSpeed()));
-//                    ((TextView) findViewById(R.id.textViewSat)).setText(gps.getNumberOfSatellites());
-                } else {
-                    gps.showSettingsAlert();
-                }
-                */
             }
         });
 
@@ -119,18 +123,57 @@ public class MyActivity extends Activity {
                 } catch (NumberFormatException e) {
 
                 }
-                gps.requestLocationUpdates(updateInterval, locationListener2);
-                buttonStop.setActivated(true);
-                buttonCont.setActivated(false);
+                locationListener = locationListenerForUpdates;
+                gps.requestLocationUpdates(updateInterval, locationListener);
+
+                // Wersja z wątkiem i singleUpdate
+//                locationListener = locationListenerForContinuousSingleUpdate;
+//                if (t == null || !t.isAlive()) {
+//                    Log.d("Thred", "start");
+//                    t = new Thread(new Runnable() {
+//                        public Handler handler;
+//                        @Override
+//                        public void run() {
+//                            Log.d("In Thread", "running");
+//                            if(!Thread.currentThread().isInterrupted()) {
+//                                Looper.prepare();
+////                    while (!Thread.currentThread().isInterrupted()) {
+////                        gps.requestLocationSingleUpdate(locationListener2);
+////                        Thread.sleep(3000);
+////                    }
+//                                locationHandler = new Handler() {
+//                                    @Override
+//                                    public void handleMessage(Message msg) {
+//                                        gps.requestLocationSingleUpdate(locationListener3);
+//                                    }
+//                                };
+//                                gps.requestLocationSingleUpdate(locationListener);
+//                                Looper.loop();
+//                                Log.d("In Thread", "after loop");
+//                            }
+//                            Log.d("In Thread", "after try/catch");
+//                        }
+//                    });
+//                    t.start();
+//                }
+
+                buttonStop.setEnabled(true);
+                buttonCont.setEnabled(false);
             }
         });
 
         buttonStop.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                gps.stopUsingGPS(locationListener2);
-                buttonStop.setActivated(false);
-                buttonCont.setActivated(true);
+                // Wersja z wątkiem i singleUpdate
+//                if (t != null && t.isAlive()) {
+//                    locationHandler.getLooper().quit();
+//                    t.interrupt();
+//                }
+                locationListener = locationListenerForUpdates;
+                gps.stopUsingGPS(locationListener);
+                buttonStop.setEnabled(false);
+                buttonCont.setEnabled(true);
             }
         });
 
@@ -148,11 +191,11 @@ public class MyActivity extends Activity {
         super.onResume();
 
         if (gps.isRequestingLocationUpdates()) {
-            buttonStop.setActivated(true);
-            buttonCont.setActivated(false);
+            buttonStop.setEnabled(true);
+            buttonCont.setEnabled(false);
         } else {
-            buttonStop.setActivated(false);
-            buttonCont.setActivated(true);
+            buttonStop.setEnabled(false);
+            buttonCont.setEnabled(true);
         }
     }
 

@@ -62,7 +62,6 @@ public class GPSTracker extends Service implements LocationListener {
         this.mContext = context;
 //        getLocation();
         updateCounter = 0;
-//        gpsStatus = new GpsStatus();
     }
 
     /**
