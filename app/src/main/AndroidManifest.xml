@@ -3,6 +3,7 @@
     package="com.example.filip.myapplication" >
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
         android:allowBackup="true"
@@ -19,8 +20,9 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".LocationsFromDbList"
-            android:label="@string/title_activity_locations_from_db_list" >
+            android:name=".LocationsFromDb"
+            android:label="@string/title_activity_locations_from_db_list"
+            android:windowSoftInputMode="stateHidden">
         </activity>
     </application>
 

@@ -4,9 +4,9 @@ import android.app.Activity;
 import android.content.Intent;
 import android.location.Location;
 import android.location.LocationListener;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 import android.view.Menu;
@@ -16,7 +16,11 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
-import com.example.filip.myapplication.db.DbHandler;
+import com.example.filip.myapplication.db.LocalDatabaseHandler;
+import com.example.filip.myapplication.db.RemoteDatabaseHandler;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 
 public class MyActivity extends Activity {
@@ -31,22 +35,28 @@ public class MyActivity extends Activity {
     private LocationListener locationListenerForDebugWithoutWritingToDb;
     private LocationListener locationListenerForUpdates;
     private LocationListener locationListenerForContinuousSingleUpdate;
-    DbHandler dbHandler;
+    LocalDatabaseHandler localDatabaseHandler;
     Thread t;
     Handler locationHandler;
+
+    RemoteDatabaseHandler remoteDatabase;
+    int currentGroupId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_my);
 
-        dbHandler = new DbHandler(this);
+        localDatabaseHandler = new LocalDatabaseHandler(this);
         buttonSingle = ((Button) findViewById(R.id.buttonSingle));
         buttonCont = (Button) findViewById(R.id.buttonCont);
         buttonStop = (Button) findViewById(R.id.buttonStop);
         buttonShow = (Button) findViewById(R.id.buttonShow);
         editTextUpdateInterval = (EditText) findViewById(R.id.editTextUpdateInterval);
         gps = new GPSTracker(this);
+
+        remoteDatabase = new RemoteDatabaseHandler();
+        currentGroupId = 0;
 
         locationListenerForDebugWithoutWritingToDb = new LocationListener() {
             @Override
@@ -74,8 +84,10 @@ public class MyActivity extends Activity {
         locationListenerForUpdates = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
-                dbHandler.addLocation(location);
-                Log.d("Got it", String.valueOf(location.getTime()));
+                Log.d("onLocationsChanged", String.valueOf(location.getTime()));
+                Location l = new Location(location);
+                localDatabaseHandler.addLocation(l);
+                new WriteToDb().execute(l);
             }
 
             @Override
@@ -91,7 +103,7 @@ public class MyActivity extends Activity {
         locationListenerForContinuousSingleUpdate = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
-                dbHandler.addLocation(location);
+                localDatabaseHandler.addLocation(location);
                 Log.d("Got it", String.valueOf(location.getTime()));
                 locationHandler.sendMessage(Message.obtain());
             }
@@ -117,6 +129,23 @@ public class MyActivity extends Activity {
         buttonCont.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                t = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        JSONObject json = remoteDatabase.getNextGroup("Testowanie z Androida czad");
+                        try {
+                            if (json.getString("success") != null) {
+                                if (Integer.parseInt(json.getString("success")) == 1) {
+                                    currentGroupId = Integer.parseInt(json.getJSONObject("nextGroup").getString("_id"));
+                                }
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
+                t.start();
+
                 int updateInterval = 3000;
                 try {
                     updateInterval = Integer.parseInt(editTextUpdateInterval.getText().toString());
@@ -159,6 +188,8 @@ public class MyActivity extends Activity {
 
                 buttonStop.setEnabled(true);
                 buttonCont.setEnabled(false);
+
+                buttonCont.setKeepScreenOn(true);
             }
         });
 
@@ -174,13 +205,14 @@ public class MyActivity extends Activity {
                 gps.stopUsingGPS(locationListener);
                 buttonStop.setEnabled(false);
                 buttonCont.setEnabled(true);
+                buttonCont.setKeepScreenOn(false);
             }
         });
 
         buttonShow.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Intent intent = new Intent(view.getContext(), LocationsFromDbList.class);
+                Intent intent = new Intent(view.getContext(), LocationsFromDb.class);
                 startActivity(intent);
             }
         });
@@ -234,5 +266,35 @@ public class MyActivity extends Activity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private class WriteToDb extends AsyncTask <Location, Void, Location> {
+
+        @Override
+        protected Location doInBackground(Location... locations) {
+            Location location = locations[0];
+            Log.d(getClass().getSimpleName(), "background... time: " + location.getTime());
+            if (currentGroupId != 0) {
+                remoteDatabase.addLocation(
+                        currentGroupId,
+                        location.getLatitude(),
+                        location.getLongitude(),
+                        location.getAccuracy(),
+                        location.getTime(),
+                        location.getElapsedRealtimeNanos(),
+                        location.getAltitude(),
+                        location.getBearing(),
+                        location.getSpeed(),
+                        location.getExtras().getInt("satellites"));
+            }
+            return location;
+        }
+
+        @Override
+        protected void onPostExecute(Location location) {
+            super.onPostExecute(location);
+
+            Log.d("Got it", String.valueOf(location.getTime()));
+        }
     }
 }
