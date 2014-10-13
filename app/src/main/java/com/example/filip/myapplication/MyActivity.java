@@ -1,9 +1,12 @@
 package com.example.filip.myapplication;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.location.Location;
 import android.location.LocationListener;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -87,7 +90,9 @@ public class MyActivity extends Activity {
                 Log.d("onLocationsChanged", String.valueOf(location.getTime()));
                 Location l = new Location(location);
                 localDatabaseHandler.addLocation(l);
-                new WriteToDb().execute(l);
+                if (isNetworkAvailable()) {
+                    new WriteToDb().execute(l);
+                }
             }
 
             @Override
@@ -129,22 +134,24 @@ public class MyActivity extends Activity {
         buttonCont.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                t = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        JSONObject json = remoteDatabase.getNextGroup("Testowanie z Androida czad");
-                        try {
-                            if (json.getString("success") != null) {
-                                if (Integer.parseInt(json.getString("success")) == 1) {
-                                    currentGroupId = Integer.parseInt(json.getJSONObject("nextGroup").getString("_id"));
+                if(isNetworkAvailable()) {
+                    t = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            JSONObject json = remoteDatabase.getNextGroup("Testowanie z Androida czad");
+                            try {
+                                if (json.getString("success") != null) {
+                                    if (Integer.parseInt(json.getString("success")) == 1) {
+                                        currentGroupId = Integer.parseInt(json.getJSONObject("nextGroup").getString("_id"));
+                                    }
                                 }
+                            } catch (JSONException e) {
+                                e.printStackTrace();
                             }
-                        } catch (JSONException e) {
-                            e.printStackTrace();
                         }
-                    }
-                });
-                t.start();
+                    });
+                    t.start();
+                }
 
                 int updateInterval = 3000;
                 try {
@@ -275,7 +282,7 @@ public class MyActivity extends Activity {
             Location location = locations[0];
             Log.d(getClass().getSimpleName(), "background... time: " + location.getTime());
             if (currentGroupId != 0) {
-                remoteDatabase.addLocation(
+                JSONObject json = remoteDatabase.addLocation(
                         currentGroupId,
                         location.getLatitude(),
                         location.getLongitude(),
@@ -287,6 +294,7 @@ public class MyActivity extends Activity {
                         location.getSpeed(),
                         location.getExtras().getInt("satellites"));
             }
+
             return location;
         }
 
@@ -296,5 +304,11 @@ public class MyActivity extends Activity {
 
             Log.d("Got it", String.valueOf(location.getTime()));
         }
+    }
+
+    private boolean isNetworkAvailable() {
+        ConnectivityManager connectivityManager=(ConnectivityManager)this.getSystemService(Context.CONNECTIVITY_SERVICE); // change 'this' to 'context'
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
     }
 }

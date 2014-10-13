@@ -27,6 +27,8 @@ public class JSONParser {
         JSONObject jsonObject = null;
 
         // Send POST to url, get String response
+        // TODO consider changing DefaultHttpClient to HttpURLConnection
+        // TODO consider not getting response from Http
         try {
             DefaultHttpClient defaultHttpClient = new DefaultHttpClient();
             HttpPost httpPost = new HttpPost(url);
