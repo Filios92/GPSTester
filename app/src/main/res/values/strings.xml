@@ -7,5 +7,31 @@
     <string name="title_activity_locations_from_db_list">LocationsFromDbList</string>
     <string name="action_delete_db">Delete all</string>
     <string name="action_drop_db">Drop db</string>
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+
+    <!-- Location parameters -->
+    <string name="locations_latitude">Latitude</string>
+    <string name="locations_longitude">Longitude</string>
+    <string name="locations_accuracy">Accuracy</string>
+    <string name="locations_time">Time</string>
+    <string name="locations_time_nano">RealElapsedTime (ns)</string>
+    <string name="locations_altitude">Altitude</string>
+    <string name="locations_bearing">Bearing</string>
+    <string name="locations_speed">Speed</string>
+    <string name="locations_number_of_sat">Number of satellites</string>
+    <string name="locations_provider">Provider</string>
+    <string name="table_no_data">No data</string>
+    <string name="group_desc_default">No description</string>
+    <string name="avg_latitude_label">Avg latitude</string>
+    <string name="avg_longitude_label">Avg longitude</string>
+    <string name="start_date_label">Start date</string>
+    <string name="stop_date_label">End date</string>
+    <string name="button_get_single_update">Get location</string>
+    <string name="button_start_continuous_update">Start saving location</string>
+    <string name="button_stop_continuous_update">Stop saving location</string>
+    <string name="title_fragment_db_info">Info</string>
+    <string name="title_fragment_single_update">Single update</string>
+    <string name="title_fragment_continuous_update">Continuous update</string>
+    <string name="title_activity_maps">Map</string>
 
 </resources>

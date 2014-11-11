@@ -1,6 +1,8 @@
 package com.example.filip.myapplication;
 
 import android.app.Activity;
+import android.app.Fragment;
+import android.app.FragmentManager;
 import android.content.Context;
 import android.content.Intent;
 import android.location.Location;
@@ -11,6 +13,8 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.v13.app.FragmentPagerAdapter;
+import android.support.v4.view.ViewPager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -21,51 +25,69 @@ import android.widget.TextView;
 
 import com.example.filip.myapplication.db.LocalDatabaseHandler;
 import com.example.filip.myapplication.db.RemoteDatabaseHandler;
+import com.example.filip.myapplication.fragments.ContinuousUpdateFragment;
+import com.example.filip.myapplication.fragments.DbInfoFragment;
+import com.example.filip.myapplication.fragments.SingleUpdateFragment;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Locale;
 
-public class MyActivity extends Activity {
 
-    Button buttonSingle;
-    Button buttonCont;
-    Button buttonStop;
-    Button buttonShow;
-    EditText editTextUpdateInterval;
-    GPSTracker gps;
-    private LocationListener locationListener;
-    private LocationListener locationListenerForDebugWithoutWritingToDb;
-    private LocationListener locationListenerForUpdates;
-    private LocationListener locationListenerForContinuousSingleUpdate;
-    LocalDatabaseHandler localDatabaseHandler;
+public class MyActivity extends Activity implements ViewPager.OnPageChangeListener {
+
+    DbInfoFragment              dbInfoFragment;
+    SingleUpdateFragment        singleUpdateFragment;
+    ContinuousUpdateFragment    continuousUpdateFragment;
+
+    MySectionsPagerAdapter      mySectionsPagerAdapter;
+    ViewPager                   viewPager;
+
     Thread t;
-    Handler locationHandler;
 
-    RemoteDatabaseHandler remoteDatabase;
+    public GPSTracker           gps;
+    private LocationListener    locationListener;
+    private LocationListener    locationListenerForDebugWithoutWritingToDb;
+    private LocationListener    locationListenerForUpdates;
+    private LocationListener    locationListenerForContinuousSingleUpdate;
+    private Location            oldLocation;
+
+    public LocalDatabaseHandler        localDatabaseHandler;
+    public RemoteDatabaseHandler       remoteDatabase;
+
     int currentGroupId;
+    int remoteMaxGroupId;
+    int localMaxGroupId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_my);
 
-        localDatabaseHandler = new LocalDatabaseHandler(this);
-        buttonSingle = ((Button) findViewById(R.id.buttonSingle));
-        buttonCont = (Button) findViewById(R.id.buttonCont);
-        buttonStop = (Button) findViewById(R.id.buttonStop);
-        buttonShow = (Button) findViewById(R.id.buttonShow);
-        editTextUpdateInterval = (EditText) findViewById(R.id.editTextUpdateInterval);
-        gps = new GPSTracker(this);
-
-        remoteDatabase = new RemoteDatabaseHandler();
         currentGroupId = 0;
+        remoteDatabase              = new RemoteDatabaseHandler();
+        localDatabaseHandler        = new LocalDatabaseHandler(this);
+        gps                         = new GPSTracker(this);
+
+        dbInfoFragment              = new DbInfoFragment();
+        singleUpdateFragment        = new SingleUpdateFragment();
+        continuousUpdateFragment    = new ContinuousUpdateFragment();
+
+        // Create the adapter that will return a fragment for each of the three
+        // primary sections of the activity.
+        mySectionsPagerAdapter      = new MySectionsPagerAdapter(getFragmentManager());
+
+        // Set up the ViewPager with the sections adapter.
+        viewPager = (ViewPager) findViewById(R.id.pager);
+        viewPager.setAdapter(mySectionsPagerAdapter);
+        viewPager.setOnPageChangeListener(this);
 
         locationListenerForDebugWithoutWritingToDb = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
                 gps.onLocationChanged(location);
-                updateView();
+                singleUpdateFragment.updateViews();
             }
 
             @Override
@@ -88,10 +110,25 @@ public class MyActivity extends Activity {
             @Override
             public void onLocationChanged(Location location) {
                 Log.d("onLocationsChanged", String.valueOf(location.getTime()));
-                Location l = new Location(location);
-                localDatabaseHandler.addLocation(l);
-                if (isNetworkAvailable()) {
-                    new WriteToDb().execute(l);
+//                Location l = new Location(location);
+                Location l = location;
+
+                if(oldLocation == null
+                        || (   oldLocation.getLatitude()  != l.getLatitude()
+                            && oldLocation.getLongitude() != l.getLongitude() )
+                        ) {
+                    gps.setLocation(l);
+//                    localDatabaseHandler.addLocation(l, currentGroupId); // moved to WriteToDb
+//                    if (isNetworkAvailable()) {
+                        new WriteToDb().execute(l);
+//                    }
+                    if (oldLocation == null) {
+                        oldLocation = new Location(l);
+                    } else {
+                        oldLocation.set(l);
+                    }
+                } else {
+                    Log.d("location changed", "not saving the same location");
                 }
             }
 
@@ -108,9 +145,9 @@ public class MyActivity extends Activity {
         locationListenerForContinuousSingleUpdate = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
-                localDatabaseHandler.addLocation(location);
+                localDatabaseHandler.addLocation(location, currentGroupId);
                 Log.d("Got it", String.valueOf(location.getTime()));
-                locationHandler.sendMessage(Message.obtain());
+                //locationHandler.sendMessage(Message.obtain());
             }
 
             @Override
@@ -122,120 +159,25 @@ public class MyActivity extends Activity {
             @Override
             public void onProviderDisabled(String s) {}
         };
-
-        buttonSingle.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                locationListener = locationListenerForDebugWithoutWritingToDb;
-                gps.requestLocationSingleUpdate(locationListener);
-            }
-        });
-
-        buttonCont.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if(isNetworkAvailable()) {
-                    t = new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            JSONObject json = remoteDatabase.getNextGroup("Testowanie z Androida czad");
-                            try {
-                                if (json.getString("success") != null) {
-                                    if (Integer.parseInt(json.getString("success")) == 1) {
-                                        currentGroupId = Integer.parseInt(json.getJSONObject("nextGroup").getString("_id"));
-                                    }
-                                }
-                            } catch (JSONException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    });
-                    t.start();
-                }
-
-                int updateInterval = 3000;
-                try {
-                    updateInterval = Integer.parseInt(editTextUpdateInterval.getText().toString());
-                } catch (NumberFormatException e) {
-
-                }
-                locationListener = locationListenerForUpdates;
-                gps.requestLocationUpdates(updateInterval, locationListener);
-
-                // Wersja z wątkiem i singleUpdate
-//                locationListener = locationListenerForContinuousSingleUpdate;
-//                if (t == null || !t.isAlive()) {
-//                    Log.d("Thred", "start");
-//                    t = new Thread(new Runnable() {
-//                        public Handler handler;
-//                        @Override
-//                        public void run() {
-//                            Log.d("In Thread", "running");
-//                            if(!Thread.currentThread().isInterrupted()) {
-//                                Looper.prepare();
-////                    while (!Thread.currentThread().isInterrupted()) {
-////                        gps.requestLocationSingleUpdate(locationListener2);
-////                        Thread.sleep(3000);
-////                    }
-//                                locationHandler = new Handler() {
-//                                    @Override
-//                                    public void handleMessage(Message msg) {
-//                                        gps.requestLocationSingleUpdate(locationListener3);
-//                                    }
-//                                };
-//                                gps.requestLocationSingleUpdate(locationListener);
-//                                Looper.loop();
-//                                Log.d("In Thread", "after loop");
-//                            }
-//                            Log.d("In Thread", "after try/catch");
-//                        }
-//                    });
-//                    t.start();
-//                }
-
-                buttonStop.setEnabled(true);
-                buttonCont.setEnabled(false);
-
-                buttonCont.setKeepScreenOn(true);
-            }
-        });
-
-        buttonStop.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                // Wersja z wątkiem i singleUpdate
-//                if (t != null && t.isAlive()) {
-//                    locationHandler.getLooper().quit();
-//                    t.interrupt();
-//                }
-                locationListener = locationListenerForUpdates;
-                gps.stopUsingGPS(locationListener);
-                buttonStop.setEnabled(false);
-                buttonCont.setEnabled(true);
-                buttonCont.setKeepScreenOn(false);
-            }
-        });
-
-        buttonShow.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Intent intent = new Intent(view.getContext(), LocationsFromDb.class);
-                startActivity(intent);
-            }
-        });
+//
+//        try {
+//            dbInfoFragment.updateViews();
+//        } catch (NullPointerException e) {
+//            Log.e("dbInfoFragment", e.toString());
+//        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-
-        if (gps.isRequestingLocationUpdates()) {
-            buttonStop.setEnabled(true);
-            buttonCont.setEnabled(false);
-        } else {
-            buttonStop.setEnabled(false);
-            buttonCont.setEnabled(true);
-        }
+//
+//        Button btn = ((Button) findViewById(R.id.buttonToggleUpdate));
+//
+//        if (gps.isRequestingLocationUpdates()) {
+//            btn.setText(R.string.button_stop_continuous_update);
+//        } else {
+//            btn.setText(R.string.button_start_continuous_update);
+//        }
     }
 
     @Override
@@ -244,7 +186,7 @@ public class MyActivity extends Activity {
         gps.stopUsingGPS(locationListener);
     }
 
-    public void updateView() {
+    public void updateView() { /*
         ((TextView) findViewById(R.id.textViewLat)).setText(String.valueOf(gps.getLatitude()));
         ((TextView) findViewById(R.id.textViewLng)).setText(String.valueOf(gps.getLongitude()));
         ((TextView) findViewById(R.id.textViewAcc)).setText(String.valueOf(gps.getAccuracy()));
@@ -253,13 +195,41 @@ public class MyActivity extends Activity {
         ((TextView) findViewById(R.id.textViewTime)).setText(String.valueOf(gps.getTime()));
         ((TextView) findViewById(R.id.textViewProvider)).setText(String.valueOf(gps.getProvider()));
         ((TextView) findViewById(R.id.textViewSpeed)).setText(String.valueOf(gps.getSpeed()));
-        ((TextView) findViewById(R.id.textViewSat)).setText(String.valueOf(gps.getNumberOfSatellites()));
+        ((TextView) findViewById(R.id.textViewSat)).setText(String.valueOf(gps.getNumberOfSatellites())); */
+    }
+
+    @Override
+    public void onPageScrolled(int i, float v, int i2) {
+
+    }
+
+    @Override
+    public void onPageSelected(int i) {
+        invalidateOptionsMenu();
+    }
+
+    @Override
+    public void onPageScrollStateChanged(int i) {
+
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+//        return super.onPrepareOptionsMenu(menu);
+        int pageNum = viewPager.getCurrentItem();
+        if (pageNum != 0) {
+            menu.findItem(R.id.action_drop_db).setEnabled(false);
+            menu.findItem(R.id.action_drop_db).setVisible(false);
+            menu.findItem(R.id.action_delete_db).setEnabled(false);
+            menu.findItem(R.id.action_delete_db).setVisible(false);
+        }
+        return true;
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.my, menu);
+        getMenuInflater().inflate(R.menu.database_menu, menu);
         return true;
     }
 
@@ -269,10 +239,17 @@ public class MyActivity extends Activity {
         // automatically handle clicks on the Home/Up button, so long
         // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
-        if (id == R.id.action_settings) {
-            return true;
+        switch (id) {
+            case R.id.action_delete_db:
+                localDatabaseHandler.deleteAll();
+                return true;
+            case R.id.action_drop_db:
+                deleteDatabase(localDatabaseHandler.getDatabaseName());
+                localDatabaseHandler = new LocalDatabaseHandler(this);
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
         }
-        return super.onOptionsItemSelected(item);
     }
 
     private class WriteToDb extends AsyncTask <Location, Void, Location> {
@@ -281,9 +258,12 @@ public class MyActivity extends Activity {
         protected Location doInBackground(Location... locations) {
             Location location = locations[0];
             Log.d(getClass().getSimpleName(), "background... time: " + location.getTime());
-            if (currentGroupId != 0) {
+
+            localDatabaseHandler.addLocation(location, currentGroupId);
+
+            if (remoteMaxGroupId != 0) {
                 JSONObject json = remoteDatabase.addLocation(
-                        currentGroupId,
+                        remoteMaxGroupId,
                         location.getLatitude(),
                         location.getLongitude(),
                         location.getAccuracy(),
@@ -292,8 +272,20 @@ public class MyActivity extends Activity {
                         location.getAltitude(),
                         location.getBearing(),
                         location.getSpeed(),
-                        location.getExtras().getInt("satellites"));
-            }
+                        location.getExtras().getInt("satellites"),
+                        location.getProvider());
+
+                try {
+                    if (Integer.parseInt(json.getString("success")) == 1) {
+                        long _id = Integer.parseInt(json.getJSONObject("added").getString("_id"));
+                        remoteDatabase.addGPSSatellites(_id, gps.gpsStatus);
+                    }
+                } catch (Exception e) {
+                    Log.e("Saving satellites error", e.toString());
+                }
+            } // else {
+//                gps.setLocation(location); // if no internet connection, setLocation for view update
+//            }
 
             return location;
         }
@@ -303,6 +295,8 @@ public class MyActivity extends Activity {
             super.onPostExecute(location);
 
             Log.d("Got it", String.valueOf(location.getTime()));
+
+            continuousUpdateFragment.updateViews();
         }
     }
 
@@ -310,5 +304,129 @@ public class MyActivity extends Activity {
         ConnectivityManager connectivityManager=(ConnectivityManager)this.getSystemService(Context.CONNECTIVITY_SERVICE); // change 'this' to 'context'
         NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
         return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+    }
+
+    public void getSingleUpdate(View v) {
+        locationListener = locationListenerForDebugWithoutWritingToDb;
+        gps.requestLocationSingleUpdate(locationListener);
+    }
+
+    public void toggleContinuousUpdate(final View v) {
+
+        locationListener = locationListenerForUpdates;
+
+        if (gps.isRequestingLocationUpdates()) {
+            gps.stopUsingGPS(locationListener);
+            v.setKeepScreenOn(false);
+            ((Button)v).setText(R.string.button_start_continuous_update);
+        }
+        else {
+
+            if (!gps.canGetLocation()) {
+                gps.showSettingsAlert();
+                return;
+            }
+            remoteMaxGroupId = 0;
+            localMaxGroupId = 0;
+            currentGroupId = 0;
+
+            final String groupDesc;
+            String tmpGroupDesc = ((EditText)findViewById(R.id.edit_text_group_description)).getText().toString();
+            if (tmpGroupDesc.isEmpty()) {
+                tmpGroupDesc = getString(R.string.group_desc_default);
+            }
+            groupDesc = tmpGroupDesc;
+            Log.d("groupDesc", " = " + groupDesc);
+
+            if(isNetworkAvailable()) {
+                t = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        JSONObject json = remoteDatabase.getNextGroup(groupDesc);
+                        try {
+                            if (json.getString("success") != null) {
+                                if (Integer.parseInt(json.getString("success")) == 1) {
+                                    remoteMaxGroupId = Integer.parseInt(json.getJSONObject("nextGroup").getString("_id"));
+//                                    localDatabaseHandler.addGroup(currentGroupId, groupDesc);
+                                }
+                                else {
+                                    remoteMaxGroupId = 0;
+                                }
+                            }
+                        } catch (Exception e) {
+                            // TODO
+//                            e.printStackTrace();
+                        }
+                    }
+                });
+                t.start();
+            }
+
+            if (t.isAlive()) {
+                try {
+                    t.join();
+                } catch (InterruptedException e) {
+                    Log.e("Getting group id thread", e.getMessage());
+                }
+            }
+
+            localMaxGroupId = localDatabaseHandler.getLastGroupId() + 1;
+            currentGroupId = (localMaxGroupId > remoteMaxGroupId) ? localMaxGroupId : remoteMaxGroupId ;
+
+            localDatabaseHandler.addGroup(currentGroupId, groupDesc);
+
+            gps.requestLocationUpdates(locationListener);
+            v.setKeepScreenOn(true);
+            ((Button)v).setText(R.string.button_stop_continuous_update);
+        }
+    }
+
+
+    /**
+     * A {@link FragmentPagerAdapter} that returns a fragment corresponding to
+     * one of the sections/tabs/pages.
+     */
+    public class MySectionsPagerAdapter extends FragmentPagerAdapter {
+
+        public MySectionsPagerAdapter(FragmentManager fm) {
+            super(fm);
+        }
+
+        @Override
+        public Fragment getItem(int position) {
+            // getItem is called to instantiate the fragment for the given page.
+            // Return a PlaceholderFragment (defined as a static inner class below).
+            //return PlaceholderFragment.newInstance(position + 1);
+            //return DestinationChooserFragment.newInstance(getApplicationContext(), position);
+            switch (position) {
+                case 0:
+                    return dbInfoFragment;
+                case 1:
+                    return singleUpdateFragment;
+                case 2:
+                    return continuousUpdateFragment;
+            }
+            return null;
+        }
+
+        @Override
+        public int getCount() {
+            // Show 3 total pages.
+            return 3;
+        }
+
+        @Override
+        public CharSequence getPageTitle(int position) {
+            Locale l = Locale.getDefault();
+            switch (position) {
+                case 0:
+                    return getString(R.string.title_fragment_db_info).toUpperCase(l);
+                case 1:
+                    return getString(R.string.title_fragment_single_update).toUpperCase(l);
+                case 2:
+                    return getString(R.string.title_fragment_continuous_update).toUpperCase(l);
+            }
+            return null;
+        }
     }
 }

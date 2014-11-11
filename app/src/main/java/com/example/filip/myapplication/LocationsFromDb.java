@@ -33,7 +33,7 @@ public class LocationsFromDb extends Activity implements LoaderManager.LoaderCal
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_locations_from_db_list);
 
-        ListView listViewOfSavedLocations = (ListView) findViewById(R.id.listViewOfSavedLocations);
+        ListView listViewOfSavedLocations = (ListView) findViewById(R.id.listViewOfSavedLocations1);
 
         // For the cursor adapter, specify which columns go into which views
         String[] fromColumns = {LocalDatabaseHandler.KEY_ID};
@@ -74,7 +74,7 @@ public class LocationsFromDb extends Activity implements LoaderManager.LoaderCal
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.locations_from_db_list, menu);
+        getMenuInflater().inflate(R.menu.database_menu, menu);
         return true;
     }
 
