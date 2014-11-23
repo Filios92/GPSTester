@@ -181,7 +181,7 @@ public class GPSTracker extends Service implements LocationListener, GpsStatus.L
     }
 
     public void setLocation(Location l) {
-        this.location = l;
+        this.location = new Location(l);
     }
 
     /**

@@ -50,8 +50,9 @@ public class MyActivity extends Activity implements ViewPager.OnPageChangeListen
     private LocationListener    locationListener;
     private LocationListener    locationListenerForDebugWithoutWritingToDb;
     private LocationListener    locationListenerForUpdates;
-    private LocationListener    locationListenerForContinuousSingleUpdate;
-    private Location            oldLocation;
+//    private Location            oldLocation;
+    private double oldLatitude;
+    private double oldLongitude;
 
     public LocalDatabaseHandler        localDatabaseHandler;
     public RemoteDatabaseHandler       remoteDatabase;
@@ -111,22 +112,27 @@ public class MyActivity extends Activity implements ViewPager.OnPageChangeListen
             public void onLocationChanged(Location location) {
                 Log.d("onLocationsChanged", String.valueOf(location.getTime()));
 //                Location l = new Location(location);
-                Location l = location;
+//                Location l = location;
 
-                if(oldLocation == null
-                        || (   oldLocation.getLatitude()  != l.getLatitude()
-                            && oldLocation.getLongitude() != l.getLongitude() )
+                if(oldLatitude == 0.0 // should be changed probably, cause 0.0 could be valid
+                        || (   oldLatitude  != location.getLatitude()
+                            && oldLongitude != location.getLongitude() )
                         ) {
-                    gps.setLocation(l);
+                    gps.setLocation(location);
 //                    localDatabaseHandler.addLocation(l, currentGroupId); // moved to WriteToDb
+
 //                    if (isNetworkAvailable()) {
-                        new WriteToDb().execute(l);
+                        new WriteToDb().execute(location);
 //                    }
-                    if (oldLocation == null) {
-                        oldLocation = new Location(l);
-                    } else {
-                        oldLocation.set(l);
-                    }
+
+//                    if (oldLocation == null) {
+//                        oldLocation = new Location(location);
+//                    } else {
+//                        oldLocation.set(location);
+//                    }
+
+                    oldLatitude  = location.getLatitude();
+                    oldLongitude = location.getLongitude();
                 } else {
                     Log.d("location changed", "not saving the same location");
                 }
@@ -141,30 +147,6 @@ public class MyActivity extends Activity implements ViewPager.OnPageChangeListen
             @Override
             public void onProviderDisabled(String s) {}
         };
-
-        locationListenerForContinuousSingleUpdate = new LocationListener() {
-            @Override
-            public void onLocationChanged(Location location) {
-                localDatabaseHandler.addLocation(location, currentGroupId);
-                Log.d("Got it", String.valueOf(location.getTime()));
-                //locationHandler.sendMessage(Message.obtain());
-            }
-
-            @Override
-            public void onStatusChanged(String s, int i, Bundle bundle) {}
-
-            @Override
-            public void onProviderEnabled(String s) {}
-
-            @Override
-            public void onProviderDisabled(String s) {}
-        };
-//
-//        try {
-//            dbInfoFragment.updateViews();
-//        } catch (NullPointerException e) {
-//            Log.e("dbInfoFragment", e.toString());
-//        }
     }
 
     @Override
@@ -184,18 +166,6 @@ public class MyActivity extends Activity implements ViewPager.OnPageChangeListen
     protected void onStop() {
         super.onStop();
         gps.stopUsingGPS(locationListener);
-    }
-
-    public void updateView() { /*
-        ((TextView) findViewById(R.id.textViewLat)).setText(String.valueOf(gps.getLatitude()));
-        ((TextView) findViewById(R.id.textViewLng)).setText(String.valueOf(gps.getLongitude()));
-        ((TextView) findViewById(R.id.textViewAcc)).setText(String.valueOf(gps.getAccuracy()));
-        ((TextView) findViewById(R.id.textView17)).setText(String.valueOf(gps.getAltitude()));
-        ((TextView) findViewById(R.id.textView18)).setText(String.valueOf(gps.getBearing()));
-        ((TextView) findViewById(R.id.textViewTime)).setText(String.valueOf(gps.getTime()));
-        ((TextView) findViewById(R.id.textViewProvider)).setText(String.valueOf(gps.getProvider()));
-        ((TextView) findViewById(R.id.textViewSpeed)).setText(String.valueOf(gps.getSpeed()));
-        ((TextView) findViewById(R.id.textViewSat)).setText(String.valueOf(gps.getNumberOfSatellites())); */
     }
 
     @Override
@@ -329,6 +299,7 @@ public class MyActivity extends Activity implements ViewPager.OnPageChangeListen
             remoteMaxGroupId = 0;
             localMaxGroupId = 0;
             currentGroupId = 0;
+            oldLatitude = 0.0;
 
             final String groupDesc;
             String tmpGroupDesc = ((EditText)findViewById(R.id.edit_text_group_description)).getText().toString();
@@ -336,7 +307,6 @@ public class MyActivity extends Activity implements ViewPager.OnPageChangeListen
                 tmpGroupDesc = getString(R.string.group_desc_default);
             }
             groupDesc = tmpGroupDesc;
-            Log.d("groupDesc", " = " + groupDesc);
 
             if(isNetworkAvailable()) {
                 t = new Thread(new Runnable() {
