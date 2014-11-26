@@ -157,6 +157,33 @@ public class LocalDatabaseHandler extends SQLiteOpenHelper {
         db.insertOrThrow(TABLE_GROUPS, null, values);
     }
 
+    public double getStd(String col, long group_id) {
+        SQLiteDatabase db = getReadableDatabase();
+        double avg = getAvg(col, group_id);
+        db.execSQL("DROP TABLE IF EXISTS tmp");
+        db.execSQL("CREATE TABLE tmp (c real)");
+        db.execSQL("INSERT INTO tmp(c) SELECT (" + col + "-"+avg+") FROM " + TABLE_LOCATIONS + " WHERE " + KEY_GROUP_ID + " = " + group_id);
+        Cursor c = db.rawQuery("SELECT * from tmp", null);
+
+        int size = c.getCount();
+        c = db.rawQuery("SELECT sum(c*c) as d FROM tmp", null);
+        c.moveToFirst();
+
+        double sum = c.getDouble(c.getColumnIndex("d"));
+
+        double ret = Math.sqrt(sum / (size-1));
+
+        db.execSQL("DROP TABLE IF EXISTS tmp");
+        return ret;
+    }
+
+    public double getAvg(String col, long group_id) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c = db.rawQuery("SELECT avg(" + col + ") AS tmp FROM " + TABLE_LOCATIONS + " WHERE " + KEY_GROUP_ID + " = " + group_id, null);
+        c.moveToFirst();
+        return c.getDouble(c.getColumnIndex("tmp"));
+    }
+
     public Cursor getDataCursor() {
         SQLiteDatabase db = getReadableDatabase();
 
@@ -177,7 +204,9 @@ public class LocalDatabaseHandler extends SQLiteOpenHelper {
                 KEY_ID,
                 KEY_GROUP_ID,
                 KEY_LATITUDE,
-                KEY_LONGITUDE
+                KEY_LONGITUDE,
+                KEY_ACCURACY,
+                KEY_NUMBER_OF_SAT
         };
 
         String where = KEY_GROUP_ID + " = ?";
@@ -187,6 +216,26 @@ public class LocalDatabaseHandler extends SQLiteOpenHelper {
         String orderBy = KEY_ID;
 
         return db.query(TABLE_LOCATIONS, cols, where, whereArgs, null, null, orderBy, null);
+    }
+
+    public Cursor getOptimizedDataForGroup(long group_id) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c;
+        double stdLat, avgLat, stdLng, avgLng;
+
+        stdLat = getStd(KEY_LATITUDE, group_id);
+        avgLat = getAvg(KEY_LATITUDE, group_id);
+        stdLng = getStd(KEY_LONGITUDE, group_id);
+        avgLng = getAvg(KEY_LONGITUDE, group_id);
+
+        return db.rawQuery("SELECT " + KEY_LATITUDE + ", "+KEY_LONGITUDE+" FROM "
+                + TABLE_LOCATIONS
+                + " WHERE " + KEY_GROUP_ID + "=" + group_id
+                + " AND " + KEY_LATITUDE + ">" + avgLat + "-" + stdLat
+                + " AND " + KEY_LATITUDE + "<" + avgLat + "+" + stdLat
+                + " AND " + KEY_LONGITUDE + ">" + avgLng + "-" + stdLng
+                + " AND " + KEY_LONGITUDE + "<" + avgLng + "+" + stdLng, null);
+
     }
 
     public Cursor getUniqueDataForGroup(long groupId) {
@@ -205,5 +254,47 @@ public class LocalDatabaseHandler extends SQLiteOpenHelper {
         Cursor c = db.rawQuery("SELECT max(" + KEY_ID + ") FROM " + TABLE_GROUPS, null);
         c.moveToFirst();
         return c.getInt(c.getColumnIndex("max("+KEY_ID+")"));
+    }
+
+    public double getOptimizedLatitude(long group_id) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c;
+        double stdLat, avgLat, stdLng, avgLng;
+
+        stdLat = getStd(KEY_LATITUDE, group_id);
+        avgLat = getAvg(KEY_LATITUDE, group_id);
+        stdLng = getStd(KEY_LONGITUDE, group_id);
+        avgLng = getAvg(KEY_LONGITUDE, group_id);
+
+        c = db.rawQuery("SELECT avg(" + KEY_LATITUDE + ") as a FROM "
+                + TABLE_LOCATIONS
+                + " WHERE " + KEY_GROUP_ID + "=" + group_id
+                + " AND " + KEY_LATITUDE + ">" + avgLat + "-" + stdLat
+                + " AND " + KEY_LATITUDE + "<" + avgLat + "+" + stdLat
+                + " AND " + KEY_LONGITUDE + ">" + avgLng + "-" + stdLng
+                + " AND " + KEY_LONGITUDE + "<" + avgLng + "+" + stdLng, null);
+        c.moveToFirst();
+        return c.getDouble(c.getColumnIndex("a"));
+    }
+
+    public double getOptimizedLongitude(long group_id) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c;
+        double stdLat, avgLat, stdLng, avgLng;
+
+        stdLat = getStd(KEY_LATITUDE, group_id);
+        avgLat = getAvg(KEY_LATITUDE, group_id);
+        stdLng = getStd(KEY_LONGITUDE, group_id);
+        avgLng = getAvg(KEY_LONGITUDE, group_id);
+
+        c = db.rawQuery("SELECT avg(" + KEY_LONGITUDE + ") as a FROM "
+                + TABLE_LOCATIONS
+                + " WHERE " + KEY_GROUP_ID + "=" + group_id
+                + " AND " + KEY_LATITUDE + ">" + avgLat + "-" + stdLat
+                + " AND " + KEY_LATITUDE + "<" + avgLat + "+" + stdLat
+                + " AND " + KEY_LONGITUDE + ">" + avgLng + "-" + stdLng
+                + " AND " + KEY_LONGITUDE + "<" + avgLng + "+" + stdLng, null);
+        c.moveToFirst();
+        return c.getDouble(c.getColumnIndex("a"));
     }
 }

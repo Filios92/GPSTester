@@ -33,5 +33,7 @@
     <string name="title_fragment_single_update">Single update</string>
     <string name="title_fragment_continuous_update">Continuous update</string>
     <string name="title_activity_maps">Map</string>
+    <string name="action_change_map_dots">Show as dots</string>
+    <string name="action_change_map_line">Show as line</string>
 
 </resources>
